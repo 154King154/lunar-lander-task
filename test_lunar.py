@@ -35,7 +35,7 @@ class agent():
         hidden = slim.fully_connected(self.state_in, h_size,
                                       biases_initializer=None, activation_fn=tf.nn.relu)
         hidden_2 = slim.fully_connected(hidden, h_size,
-                                      biases_initializer=None, activation_fn=tf.nn.relu)
+                                        biases_initializer=None, activation_fn=tf.nn.relu)
         self.output = slim.fully_connected(hidden_2, a_size,
                                            activation_fn=tf.nn.softmax, biases_initializer=None)
         self.chosen_action = tf.argmax(self.output, 1)  # выбор действия
@@ -86,7 +86,7 @@ init = tf.global_variables_initializer()
 # Запуск графа tensorflow
 with tf.Session() as sess:
     sess.run(init)
-    saver.restore(sess, "/home/alex/PycharmProjects/weights/model.ckpt")
+    saver.restore(sess, "/home/alex/PycharmProjects/weights/backup/model.ckpt")
     print("Model restored.")
     all_reward = 0
     while i < total_episodes:
