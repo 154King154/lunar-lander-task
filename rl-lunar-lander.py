@@ -1,4 +1,3 @@
-
 import gym
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
@@ -28,13 +27,13 @@ def discount_rewards(r):
 
 
 class agent():
-    def __init__(self, lr, s_size, a_size, h_size):
+    def __init__(self, lr, s_size, a_size):
         # Ниже инициализирована feed-forward часть нейросети.
         # Агент оценивает состояние среды и совершает действие
         self.state_in = tf.placeholder(shape=[None, s_size], dtype=tf.float32)
-        hidden = slim.fully_connected(self.state_in, h_size,
+        hidden = slim.fully_connected(self.state_in, 64,
                                       biases_initializer=None, activation_fn=tf.nn.relu)
-        hidden_2 = slim.fully_connected(hidden, h_size,
+        hidden_2 = slim.fully_connected(hidden, 64,
                                       biases_initializer=None, activation_fn=tf.nn.relu)
         self.output = slim.fully_connected(hidden_2, a_size,
                                            activation_fn=tf.nn.softmax, biases_initializer=None)
@@ -72,11 +71,11 @@ class agent():
 
 tf.reset_default_graph()  # Очищаем граф tensorflow
 
-myAgent = agent(lr=1e-2, s_size=8, a_size=4, h_size=64)  # Инициализируем агента
+myAgent = agent(lr=1e-2, s_size=8, a_size=4)  # Инициализируем агента
 saver = tf.train.Saver()
 
 
-total_episodes = 5000  # Количество итераций обучения
+total_episodes = 8000  # Количество итераций обучения
 max_ep = 999
 update_frequency = 5
 
@@ -106,7 +105,7 @@ with tf.Session() as sess:
             a = np.argmax(a_dist == a)
 
 
-            if i % 100 == 0: env.render()
+            #if i % 20 == 0: env.render()
 
 
             s1, r, d, _ = env.step(a)  # Получить награду за совершенное действие
@@ -141,7 +140,7 @@ with tf.Session() as sess:
             print(np.mean(total_reward[-100:]), ' --- Progress: ', i*100/total_episodes, '%')
 
 
-        if i % 1000 == 0:
+        if i % 100 == 0:
             save_path = saver.save(sess, "/home/alex/PycharmProjects/weights/model.ckpt")
             print("Model saved in path: %s" % save_path)
             print('At: ', i, ' from ', total_episodes)
