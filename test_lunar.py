@@ -1,30 +1,11 @@
-
 import gym
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow.python.saved_model import tag_constants
 import numpy as np
-#import matplotlib.pyplot as plt
-
-try:
-    xrange = xrange
-except:
-    xrange = range
 
 env = gym.make('LunarLander-v2')
-
-gamma = 0.99  # коэффициент дисконтирования
-
-
-def discount_rewards(r):
-    """ принимая на вход вектор выигришей,
-    вернуть вектор дисконтированных выигрышей"""
-    discounted_r = np.zeros_like(r)
-    running_add = 0
-    for t in reversed(xrange(0, r.size)):
-        running_add = running_add * gamma + r[t]
-        discounted_r[t] = running_add
-    return discounted_r
+WEIGHTS_PATH="/home/alex/PycharmProjects/weights/weights_learned_bck/model.ckpt" #Указать путь к сохранненым весам
 
 
 class agent():
@@ -35,7 +16,7 @@ class agent():
         hidden = slim.fully_connected(self.state_in, h_size,
                                       biases_initializer=None, activation_fn=tf.nn.relu)
         hidden_2 = slim.fully_connected(hidden, h_size,
-                                        biases_initializer=None, activation_fn=tf.nn.relu)
+                                      biases_initializer=None, activation_fn=tf.nn.relu)
         self.output = slim.fully_connected(hidden_2, a_size,
                                            activation_fn=tf.nn.softmax, biases_initializer=None)
         self.chosen_action = tf.argmax(self.output, 1)  # выбор действия
@@ -76,32 +57,56 @@ myAgent = agent(lr=1e-2, s_size=8, a_size=4, h_size=64)  # Инициализи�
 saver = tf.train.Saver()
 
 
-total_episodes = 20  # Количество итераций обучения
 max_ep = 999
-update_frequency = 5
-i = 0
-
+winned_eps=0
+PREVENT_DEF=0
 init = tf.global_variables_initializer()
+total_reward = []
+i = 1
 
-# Запуск графа tensorflow
 with tf.Session() as sess:
     sess.run(init)
-    saver.restore(sess, "/home/alex/PycharmProjects/weights/backup/model.ckpt")
+    try:
+        saver.restore(sess, WEIGHTS_PATH)
+    except:
+        sess.run(init)
     print("Model restored.")
-    all_reward = 0
-    while i < total_episodes:
-        s = env.reset()
 
+
+    print('Testing trained agent.')
+    while i < 101:
+        s = env.reset()
         running_reward = 0
+        ep_history = []
         for j in range(max_ep):
-            env.render()
             # Выбрать действие на основе вероятностей, оцененных нейросетью
-            a = np.argmax(sess.run(myAgent.output, feed_dict={myAgent.state_in: [s]}))
-            s, r, d, n = env.step(a)
+            a_dist = sess.run(myAgent.output, feed_dict={myAgent.state_in: [s]})
+            a = np.random.choice(a_dist[0], p=a_dist[0])
+            a = np.argmax(a_dist == a)
+
+            if PREVENT_DEF > 0:
+                s1, r, d, _ = env.step(0)  # Получить награду за совершенное действие
+                PREVENT_DEF -= 1
+                a = 0
+            else:
+                s1, r, d, _ = env.step(a)  # Получить награду за совершенное действие
+            ep_history.append([s, a, r, s1])
+            s = s1
             running_reward += r
-            if d:
+
+            #if i % 5 == 0: env.render() #Раскоментировать, чтобы видеть рендер каждой пятой игры
+            if int(s[6]) == int(s[7]) == 1: PREVENT_DEF = 10
+            if d == True:
+                total_reward.append(running_reward)
+                winned_eps += 1
+                PREVENT_DEF = 0
                 break
-        print('At: ', i, ' from ', running_reward)
-        all_reward+=running_reward
-        i+=1
-print("-----Mean reward:", all_reward / 20)
+
+
+        print(np.mean(total_reward[-winned_eps:]), ' --- Progress: ', i,
+                  '% --- Done param: ', len(total_reward), ' from ', i, 'episodes (', winned_eps, ' winned)')
+        winned_eps = 0
+
+        i += 1
+
+    print("-----Mean average in 100 episode:", np.mean(total_reward))
