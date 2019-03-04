@@ -1,3 +1,4 @@
+
 import gym
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
@@ -12,8 +13,9 @@ except:
 
 env = gym.make('LunarLander-v2')
 
-gamma = 0.99  # коэффициент дисконтирования
+gamma = 0.5  # коэффициент дисконтирования
 
+WEIGHTS_PATH="/home/vitaly/PycharmProjects/rl_ll/weights_learned/model.ckpt"
 
 def discount_rewards(r):
     """ принимая на вход вектор выигришей,
@@ -27,13 +29,13 @@ def discount_rewards(r):
 
 
 class agent():
-    def __init__(self, lr, s_size, a_size):
+    def __init__(self, lr, s_size, a_size, h_size):
         # Ниже инициализирована feed-forward часть нейросети.
         # Агент оценивает состояние среды и совершает действие
         self.state_in = tf.placeholder(shape=[None, s_size], dtype=tf.float32)
-        hidden = slim.fully_connected(self.state_in, 64,
+        hidden = slim.fully_connected(self.state_in, h_size,
                                       biases_initializer=None, activation_fn=tf.nn.relu)
-        hidden_2 = slim.fully_connected(hidden, 64,
+        hidden_2 = slim.fully_connected(hidden, h_size,
                                       biases_initializer=None, activation_fn=tf.nn.relu)
         self.output = slim.fully_connected(hidden_2, a_size,
                                            activation_fn=tf.nn.softmax, biases_initializer=None)
@@ -71,20 +73,24 @@ class agent():
 
 tf.reset_default_graph()  # Очищаем граф tensorflow
 
-myAgent = agent(lr=1e-2, s_size=8, a_size=4)  # Инициализируем агента
+myAgent = agent(lr=1e-2, s_size=8, a_size=4, h_size=64)  # Инициализируем агента
 saver = tf.train.Saver()
 
 
-total_episodes = 8000  # Количество итераций обучения
+total_episodes = 500  # Количество итераций обучения
 max_ep = 999
-update_frequency = 5
-
+update_frequency = 50
+winned_eps=0
+PREVENT_DEF=0
 init = tf.global_variables_initializer()
 
 # Запуск графа tensorflow
 with tf.Session() as sess:
     sess.run(init)
-    saver.restore(sess, "/home/alex/PycharmProjects/weights/model.ckpt")
+    try:
+        saver.restore(sess, WEIGHTS_PATH)
+    except:
+        sess.run(init)
     print("Model restored.")
     i = 0
     total_reward = []
@@ -105,13 +111,19 @@ with tf.Session() as sess:
             a = np.argmax(a_dist == a)
 
 
-            #if i % 20 == 0: env.render()
-
-
-            s1, r, d, _ = env.step(a)  # Получить награду за совершенное действие
+            if PREVENT_DEF>0:
+                s1, r, d, _ = env.step(0)  # Получить награду за совершенное действие
+                PREVENT_DEF-=1
+            else:
+                s1, r, d, _ = env.step(a)  # Получить награду за совершенное действие
             ep_history.append([s, a, r, s1])
             s = s1
             running_reward += r
+
+             #if i % 100 == 0: env.render()
+            env.render()
+            #print('leg_contact: right_',int(s[6]),' left_', int(s[7]))
+            if int(s[6])==int(s[7])==1: PREVENT_DEF=10
             if d == True:
                 # Обновить нейросеть
                 ep_history = np.array(ep_history)
@@ -132,21 +144,28 @@ with tf.Session() as sess:
 
                 total_reward.append(running_reward)
                 total_lenght.append(j)
+                winned_eps+=1
+                PREVENT_DEF=0
                 break
 
             # Обновить общий выигрыш
-        print("---- Reward in", i, "session:", running_reward)
-        if i % 100 == 0:
-            print(np.mean(total_reward[-100:]), ' --- Progress: ', i*100/total_episodes, '%')
+        #print("---- Reward in", i, "session:", running_reward)
+        if j == max_ep:
+            total_reward.append(running_reward-100)
+            total_lenght.append(j)
 
+        if i % 1 == 0 and i!=0:
+           # print(total_reward)
+            print(np.mean(total_reward[-winned_eps:]) , ' --- Progress: ', (i*100/total_episodes), '% --- Done param: ', len(total_reward), ' from ', i, 'episodes (',winned_eps,' winned)')
+            winned_eps = 0
 
-        if i % 100 == 0:
-            save_path = saver.save(sess, "/home/alex/PycharmProjects/weights/model.ckpt")
+        if i % 50 == 0 and i!=0:
+            save_path = saver.save(sess, WEIGHTS_PATH)
             print("Model saved in path: %s" % save_path)
             print('At: ', i, ' from ', total_episodes)
         i += 1
 
 
 
-    save_path = saver.save(sess, "/home/alex/PycharmProjects/weights/model.ckpt")
+    save_path = saver.save(sess, WEIGHTS_PATH)
     print("Model saved in path: %s" % save_path)
