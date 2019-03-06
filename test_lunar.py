@@ -4,8 +4,13 @@ import tensorflow.contrib.slim as slim
 from tensorflow.python.saved_model import tag_constants
 import numpy as np
 
+# Указываем environment для gym
 env = gym.make('LunarLander-v2')
-WEIGHTS_PATH="/home/alex/PycharmProjects/weights/weights_learned_bck/model.ckpt" #Указать путь к сохранненым весам
+
+# Папка с файлами имеющими расширение .ckpt.meta или .ckpt.*
+# Указание имени файла необходимо завершить на расширении .ckpt
+WEIGHTS_PATH="/home/alex/PycharmProjects/weights/weights_learned_bck/model.ckpt"
+
 
 
 class agent():
@@ -19,9 +24,10 @@ class agent():
                                       biases_initializer=None, activation_fn=tf.nn.relu)
         self.output = slim.fully_connected(hidden_2, a_size,
                                            activation_fn=tf.nn.softmax, biases_initializer=None)
-        self.chosen_action = tf.argmax(self.output, 1)  # выбор действия
+        # Сам выбор действия
+        self.chosen_action = tf.argmax(self.output, 1)
 
-        # Следующие 6 строк устанавливают процедуру обучения.
+        # Следующие строки устанавливают процедуру обучения.
         # Нейросеть принимает на вход выбранное действие
         # и соответствующий выигрыш,
         # чтобы оценить функцию потерь и обновить веса модели.
@@ -33,7 +39,7 @@ class agent():
 
         self.responsible_outputs = tf.gather(tf.reshape(self.output, [-1]),
                                              self.indexes)
-        # функция потерь
+        # Объявим значение (функцию) loss для потерь и расхождений
         self.loss = -tf.reduce_mean(tf.log(self.responsible_outputs) *
                                     self.reward_holder)
 
@@ -54,11 +60,11 @@ class agent():
 tf.reset_default_graph()  # Очищаем граф tensorflow
 
 myAgent = agent(lr=1e-2, s_size=8, a_size=4, h_size=64)  # Инициализируем агента
-saver = tf.train.Saver()
+saver = tf.train.Saver() # Инициализируем модуль для импорта/экспорта весов (встр. tensorflow)
 
 
-max_ep = 999
-winned_eps=0
+max_ep = 999        # Количество эпизодов
+winned_eps=0        # Счетчик выигранных эпизодов
 PREVENT_DEF=0
 init = tf.global_variables_initializer()
 total_reward = []
@@ -66,12 +72,14 @@ i = 1
 
 with tf.Session() as sess:
     sess.run(init)
+    # Попытка загрузить файл, если есть
     try:
         saver.restore(sess, WEIGHTS_PATH)
     except:
         sess.run(init)
-    print("Model restored.")
-
+        print("Model is empty. Stop testing empty model.")
+    else:
+        print("Model successfully restored.")
 
     print('Testing trained agent.')
     while i < 101:
@@ -109,4 +117,4 @@ with tf.Session() as sess:
 
         i += 1
 
-    print("-----Mean average in 100 episode:", np.mean(total_reward))
+    print("----- Average points in 100 episodes: ", np.mean(total_reward))
